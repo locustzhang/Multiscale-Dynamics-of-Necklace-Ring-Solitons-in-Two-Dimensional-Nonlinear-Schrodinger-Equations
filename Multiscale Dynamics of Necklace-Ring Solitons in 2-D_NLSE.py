@@ -21,9 +21,9 @@ warnings.filterwarnings('ignore')
 DARK_MODE = True  # True = 暗黑霓虹主题（极致视觉效果）
 
 if DARK_MODE:
-    BG_COLOR = '#000000'  # 纯黑背景 (OLED 完美显示)
-    FG_COLOR = 'white'
-    GRID_COLOR = '#1a1a2e'
+    BG_COLOR = 'white'  # 修改为白色背景
+    FG_COLOR = 'black'  # 前景色改为黑色以适配白色背景
+    GRID_COLOR = '#CCCCCC'
 else:
     BG_COLOR = 'white'
     FG_COLOR = 'black'
@@ -304,13 +304,16 @@ def create_fig1_domain(data, sys, cfg):
     indices = [0, len(t) // 3, 2 * len(t) // 3, len(t) - 1]
     labels = ['Initial', 'Formation', 'Rotation', 'Steady']
 
-    fig = plt.figure(figsize=(14, 3.5))
-    gs = GridSpec(1, 5, width_ratios=[1, 1, 1, 1, 0.08], wspace=0.3)
+    # 修改为2x2布局
+    fig = plt.figure(figsize=(7, 7))  # 调整画布尺寸适配2x2
+    gs = GridSpec(2, 3, width_ratios=[1, 1, 0.08], wspace=0.3, hspace=0.3)  # 2行3列，最后一列放色轮
 
     max_amp = np.max(np.abs(field))
 
-    for idx, (i, label) in enumerate(zip(indices, labels)):
-        ax = fig.add_subplot(gs[0, idx])
+    # 重新分配子图位置：2x2布局
+    subplot_positions = [(0, 0), (0, 1), (1, 0), (1, 1)]
+    for idx, (i, label, pos) in enumerate(zip(indices, labels, subplot_positions)):
+        ax = fig.add_subplot(gs[pos[0], pos[1]])
 
         # 提取振幅
         amp = np.abs(field[i])
@@ -333,30 +336,31 @@ def create_fig1_domain(data, sys, cfg):
         ax.add_artist(plt.Circle((0, 0), cfg.R_ring, color='cyan', fill=False, ls='--', alpha=0.6, lw=1))
         ax.plot(0, 0, '+', color='#FF00AA', markersize=10, mew=2)  # 粉色中心标记
 
-        ax.set_title(f"{label}\n($t={t[i]:.2f}$)", fontsize=10, fontweight='bold', color='white')
-        ax.set_xlabel('$x$', color='white')
-        if idx == 0: ax.set_ylabel('$y$', color='white')
+        ax.set_title(f"{label}\n($t={t[i]:.2f}$)", fontsize=10, fontweight='bold', color=FG_COLOR)
+        ax.set_xlabel('$x$', color=FG_COLOR)
+        if pos == (0, 0):  # 只在第一个子图显示y轴标签
+            ax.set_ylabel('$y$', color=FG_COLOR)
         style_axis(ax)
         ax.set_aspect('equal')
-        ax.tick_params(colors='white')
+        ax.tick_params(colors=FG_COLOR)
 
-    # 相位色轮
-    ax_wheel = fig.add_subplot(gs[0, 4])
+    # 相位色轮 - 调整位置到2行合并的列
+    ax_wheel = fig.add_subplot(gs[:, 2])
     theta = np.linspace(0, 2 * np.pi, 256)
     r = np.linspace(0, 1, 128)
     T, R = np.meshgrid(theta, r)
     HSV = np.dstack((T / (2 * np.pi), np.ones_like(T), R))
     RGB = mcolors.hsv_to_rgb(HSV)
     Xc, Yc = R * np.cos(T), R * np.sin(T)
-    RGB[Xc ** 2 + Yc ** 2 > 1] = [0, 0, 0]  # 纯黑背景
+    RGB[Xc ** 2 + Yc ** 2 > 1] = [1, 1, 1]  # 白色背景
     ax_wheel.imshow(RGB, extent=[-1, 1, -1, 1], origin='lower')
-    ax_wheel.set_title('Phase', fontsize=9, color='white')
+    ax_wheel.set_title('Phase', fontsize=9, color=FG_COLOR)
     ax_wheel.axis('off')
 
     plt.suptitle(f"NEON NECKLACE SOLITON | N={cfg.N_peaks} | g={cfg.g} | Omega={cfg.Omega}",
                  fontsize=12, fontweight='bold', y=1.02, color='#00F3FF')
-    plt.savefig(f"{OUTPUT_DIR}/Fig1_Domain.png", bbox_inches='tight', dpi=600, facecolor='black')
-    plt.savefig(f"{OUTPUT_DIR}/Fig1_Domain.pdf", bbox_inches='tight', facecolor='black')
+    plt.savefig(f"{OUTPUT_DIR}/Fig1_Domain.png", bbox_inches='tight', dpi=600, facecolor=BG_COLOR)
+    plt.savefig(f"{OUTPUT_DIR}/Fig1_Domain.pdf", bbox_inches='tight', facecolor=BG_COLOR)
     plt.close()
 
 
@@ -381,7 +385,7 @@ def create_fig2_collision(data, sys, cfg):
     labels = ['(a) App.I', '(b) App.II', '(c) Near', '(d) Pre', '(e) COLLISION',
               '(f) Merg.I', '(g) Merg.II', '(h) Post', '(i) Final']
 
-    fig = plt.figure(figsize=(15, 15), facecolor='black')
+    fig = plt.figure(figsize=(15, 15), facecolor=BG_COLOR)
     gs = GridSpec(3, 3, wspace=0.2, hspace=0.3)
 
     # 全局归一化确保一致性
@@ -389,7 +393,7 @@ def create_fig2_collision(data, sys, cfg):
 
     for idx, (i, label) in enumerate(zip(idx_list, labels)):
         ax = fig.add_subplot(gs[idx // 3, idx % 3])
-        ax.set_facecolor('black')
+        ax.set_facecolor(BG_COLOR)
 
         # 提取振幅
         amp = np.abs(field[i])
@@ -420,21 +424,21 @@ def create_fig2_collision(data, sys, cfg):
                 spine.set_linewidth(4)
             ax.set_title(label, fontsize=11, fontweight='bold', color='#FF00AA')
         else:
-            ax.set_title(label, fontsize=10, fontweight='bold', color='white')
+            ax.set_title(label, fontsize=10, fontweight='bold', color=FG_COLOR)
 
-        ax.set_xlabel('$x$', color='white', fontsize=9)
-        ax.set_ylabel('$y$', color='white', fontsize=9)
-        ax.tick_params(colors='white', labelsize=8)
+        ax.set_xlabel('$x$', color=FG_COLOR, fontsize=9)
+        ax.set_ylabel('$y$', color=FG_COLOR, fontsize=9)
+        ax.tick_params(colors=FG_COLOR, labelsize=8)
         ax.text(0.02, 0.98, f'$t={t[i]:.2f}$', transform=ax.transAxes, fontsize=9, va='top',
-                color='white', bbox=dict(boxstyle='round', facecolor='black', alpha=0.8, edgecolor='cyan'))
+                color=FG_COLOR, bbox=dict(boxstyle='round', facecolor=BG_COLOR, alpha=0.8, edgecolor='cyan'))
         style_axis(ax)
         ax.set_aspect('equal')
         ax.set_xlim(-15, 15)  # 聚焦中心区域
         ax.set_ylim(-15, 15)
 
     plt.suptitle("TWO-RING COLLISION | Enhanced Clarity", fontsize=16, fontweight='bold', color='#00F3FF', y=0.98)
-    plt.savefig(f"{OUTPUT_DIR}/Fig2_Collision.png", bbox_inches='tight', dpi=600, facecolor='black')
-    plt.savefig(f"{OUTPUT_DIR}/Fig2_Collision.pdf", bbox_inches='tight', facecolor='black')
+    plt.savefig(f"{OUTPUT_DIR}/Fig2_Collision.png", bbox_inches='tight', dpi=600, facecolor=BG_COLOR)
+    plt.savefig(f"{OUTPUT_DIR}/Fig2_Collision.pdf", bbox_inches='tight', facecolor=BG_COLOR)
     plt.close()
 
 
@@ -486,8 +490,8 @@ def create_fig3_physics(data, cfg):
     style_axis(ax)
 
     plt.tight_layout()
-    plt.savefig(f"{OUTPUT_DIR}/Fig3_Physics.png", bbox_inches='tight', dpi=600)
-    plt.savefig(f"{OUTPUT_DIR}/Fig3_Physics.pdf", bbox_inches='tight')
+    plt.savefig(f"{OUTPUT_DIR}/Fig3_Physics.png", bbox_inches='tight', dpi=600, facecolor=BG_COLOR)
+    plt.savefig(f"{OUTPUT_DIR}/Fig3_Physics.pdf", bbox_inches='tight', facecolor=BG_COLOR)
     plt.close()
 
 
@@ -518,8 +522,8 @@ def create_fig4_radial(data, sys, cfg):
 
     plt.suptitle("Radial Density Evolution", fontsize=13, fontweight='bold')
     plt.tight_layout()
-    plt.savefig(f"{OUTPUT_DIR}/Fig4_Radial.png", bbox_inches='tight', dpi=600)
-    plt.savefig(f"{OUTPUT_DIR}/Fig4_Radial.pdf", bbox_inches='tight')
+    plt.savefig(f"{OUTPUT_DIR}/Fig4_Radial.png", bbox_inches='tight', dpi=600, facecolor=BG_COLOR)
+    plt.savefig(f"{OUTPUT_DIR}/Fig4_Radial.pdf", bbox_inches='tight', facecolor=BG_COLOR)
     plt.close()
 
 
@@ -737,7 +741,7 @@ def run_parameter_scan():
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig(f"{OUTPUT_DIR}/Fig5_QuantitativeAnalysis.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"{OUTPUT_DIR}/Fig5_QuantitativeAnalysis.png", dpi=300, bbox_inches='tight', facecolor=BG_COLOR)
     plt.close()
     print("   Saved: Fig5_QuantitativeAnalysis.png")
 
