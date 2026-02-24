@@ -283,13 +283,17 @@ def create_fig1_domain(data, sys, cfg):
     indices = [0, len(t) // 3, 2 * len(t) // 3, len(t) - 1]
     labels = ['Initial', 'Formation', 'Rotation', 'Steady']
 
-    fig = plt.figure(figsize=(14, 3.5))
-    gs = GridSpec(1, 5, width_ratios=[1, 1, 1, 1, 0.08], wspace=0.3)
+    # 核心修改：将1x4布局改为2x2布局，同时调整figsize和GridSpec
+    fig = plt.figure(figsize=(7, 7))  # 从(14,3.5)改为(7,7)，适配2x2
+    gs = GridSpec(2, 3, width_ratios=[1, 1, 0.08], wspace=0.3, hspace=0.3)  # 2行3列，最后一列放色轮
 
     max_amp = np.max(np.abs(field))
 
+    # 调整子图索引映射：2x2布局的四个子图位置
+    subplot_positions = [(0,0), (0,1), (1,0), (1,1)]
     for idx, (i, label) in enumerate(zip(indices, labels)):
-        ax = fig.add_subplot(gs[0, idx])
+        # 使用新的子图位置
+        ax = fig.add_subplot(gs[subplot_positions[idx][0], subplot_positions[idx][1]])
 
         # 提取振幅
         amp = np.abs(field[i])
@@ -314,13 +318,15 @@ def create_fig1_domain(data, sys, cfg):
 
         ax.set_title(f"{label}\n($t={t[i]:.2f}$)", fontsize=10, fontweight='bold', color='white')
         ax.set_xlabel('$x$', color='white')
-        if idx == 0: ax.set_ylabel('$y$', color='white')
+        # 调整ylabel显示位置：仅第一列子图显示y轴标签
+        if subplot_positions[idx][1] == 0:
+            ax.set_ylabel('$y$', color='white')
         style_axis(ax)
         ax.set_aspect('equal')
         ax.tick_params(colors='white')
 
-    # 相位色轮
-    ax_wheel = fig.add_subplot(gs[0, 4])
+    # 相位色轮：放在2行3列布局的右侧（跨两行）
+    ax_wheel = fig.add_subplot(gs[:, 2])  # 跨两行显示色轮
     theta = np.linspace(0, 2 * np.pi, 256)
     r = np.linspace(0, 1, 128)
     T, R = np.meshgrid(theta, r)
@@ -586,4 +592,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
