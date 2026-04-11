@@ -70,9 +70,9 @@ SCAN_G_MIN          = -0.30
 SCAN_G_MAX          = -0.04
 SCAN_N_G            = 14
 
-SCAN2D_G             = np.linspace(-1.0, -0.04, 14)  # 扩展到 g=-1.0
-SCAN2D_V             = np.linspace(0.0,  0.05,  14)  # trap 扩展到 0.05
-SCAN2D_T             = 5.0
+SCAN2D_G             = np.linspace(-2.5, -0.04, 14)  # 扩展到 g=-1.0
+SCAN2D_V             = np.linspace(0.0,  0.08,  14)  # trap 扩展到 0.05
+SCAN2D_T             = 8.0
 SCAN2D_DT            = 1e-2
 # ---------------------------
 # 收敛测试
@@ -101,10 +101,10 @@ NSAVE_SCAN2D        = 40
 # ---------------------------
 # 数值稳定与崩溃判据（原硬编码）
 # ---------------------------
-COLLAPSE_RHO_FACTOR     = 100.0
+COLLAPSE_RHO_FACTOR     = 3.0
 #COLLAPSE_METRIC_THRESH  = 25.0
 # 可适当降低，让判定更灵敏
-COLLAPSE_METRIC_THRESH  = 10.0
+COLLAPSE_METRIC_THRESH  = 5.0
 DISPERSED_THRESH        = 0.4   # rho_ratio 低于此值认为结构瓦解这里是画相图
 CACHE_CLEAN_INTERVAL    = 4000
 
@@ -627,42 +627,68 @@ def run_2d_stability_scan():
     return results
 
 def fig_2d_stability(scan2d):
-    G_grid = SCAN2D_G
-    V_grid = SCAN2D_V
+    G_grid = np.array(SCAN2D_G)
+    V_grid = np.array(SCAN2D_V)
     nG, nV = len(G_grid), len(V_grid)
+    
     rho_mat = np.zeros((nG, nV))
     coll_mat = np.zeros((nG, nV))
+    nocr_mat = np.zeros((nG, nV))  # 新增：显示 N/Ncr
+    
     for i, row in enumerate(scan2d):
         for j, r in enumerate(row):
             rho_mat[i, j] = r['rho_ratio']
             coll_mat[i, j] = 1.0 if r['collapsed'] else 0.0
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-    plt.subplots_adjust(wspace=0.30)
-    ext = [V_grid[0], V_grid[-1], G_grid[0], G_grid[-1]]
-    im1 = ax1.imshow(rho_mat, origin='lower', aspect='auto', cmap=plt.cm.magma, norm=PowerNorm(gamma=0.5, vmin=rho_mat.min(), vmax=rho_mat.max()), extent=ext, interpolation='bicubic')
-    cb1 = plt.colorbar(im1, ax=ax1)
-    cb1.set_label(r'$\rho_\mathrm{max}(T)/\rho_\mathrm{max}(0)$', fontsize=11)
-    cb1.outline.set_visible(False)
+            nocr_mat[i, j] = r['N_over_Ncr']
+    
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 5))
+    plt.subplots_adjust(wspace=0.25)
+    
+    ext = [V_grid.min(), V_grid.max(), G_grid.min(), G_grid.max()]
+    
+    # (a) rho_ratio 热图
+    im1 = ax1.imshow(rho_mat.T, origin='lower', aspect='auto',
+                     cmap=plt.cm.magma, extent=ext, interpolation='bicubic')
+    plt.colorbar(im1, ax=ax1, label=r'$\rho_\mathrm{max}(T)/\rho_\mathrm{max}(0)$')
     ax1.set_xlabel(r'Trap strength $V_\mathrm{trap}$')
     ax1.set_ylabel(r'Interaction strength $g$')
-    ax1.set_title('Peak density ratio', fontsize=12)
+    ax1.set_title('(a) Peak density ratio')
     style_ax(ax1)
-    panel_label(ax1, 'a')
+    
+    # (b) 稳定性相图
     cmap_bin = mcolors.ListedColormap(['#2196F3', '#F44336'])
-    im2 = ax2.imshow(coll_mat, origin='lower', aspect='auto', cmap=cmap_bin, vmin=0, vmax=1, extent=ext, interpolation='nearest')
+    im2 = ax2.imshow(coll_mat.T, origin='lower', aspect='auto',
+                     cmap=cmap_bin, vmin=0, vmax=1, extent=ext)
     if np.any(coll_mat) and np.any(1 - coll_mat):
-        ax2.contour(np.linspace(V_grid[0], V_grid[-1], nV), np.linspace(G_grid[0], G_grid[-1], nG), coll_mat, levels=[0.5], colors='white', linewidths=1.5, linestyles='--')
-    patches = [mpatches.Patch(color='#2196F3', label='Stable'), mpatches.Patch(color='#F44336', label='Collapsed')]
+        ax2.contour(V_grid, G_grid, coll_mat.T, levels=[0.5],
+                    colors='white', linewidths=1.5, linestyles='--')
+    patches = [mpatches.Patch(color='#2196F3', label='Stable'),
+               mpatches.Patch(color='#F44336', label='Collapsed')]
     ax2.legend(handles=patches, fontsize=9, loc='upper right')
     ax2.set_xlabel(r'Trap strength $V_\mathrm{trap}$')
     ax2.set_ylabel(r'Interaction strength $g$')
-    ax2.set_title('Stability phase diagram', fontsize=12)
+    ax2.set_title('(b) Stability phase diagram')
     style_ax(ax2)
-    panel_label(ax2, 'b')
+    
+    # (c) N/Ncr 热图 (新增)
+    im3 = ax3.imshow(nocr_mat.T, origin='lower', aspect='auto',
+                     cmap=plt.cm.viridis, extent=ext, vmin=0, vmax=3)
+    ax3.axhline(y=-0.08, color='red', ls='--', lw=1.0, label='Base g=-0.08')
+    plt.colorbar(im3, ax=ax3, label=r'$N/N_\mathrm{cr}$')
+    ax3.set_xlabel(r'Trap strength $V_\mathrm{trap}$')
+    ax3.set_ylabel(r'Interaction strength $g$')
+    ax3.set_title('(c) Norm ratio')
+    style_ax(ax3)
+    
     fig.suptitle(r'Fig. 6. Two-dimensional stability phase diagram ($g$–$V_\mathrm{trap}$)', fontsize=14)
-    fig.savefig(f'{OUTPUT_DIR}/Fig6_PhaseDiagram.pdf', bbox_inches='tight')
+    fig.savefig(f'{OUTPUT_DIR}/Fig6_PhaseDiagram.pdf', bbox_inches='tight', dpi=600)
     plt.close()
-    print("[Fig6] saved.")
+    
+    # 打印统计
+    collapsed = np.sum(coll_mat)
+    total = nG * nV
+    print(f"[Fig6] Collapsed: {collapsed}/{total} = {collapsed/total:.1%}")
+    print(f"[Fig6] saved.")
 # -----------------------------------------------------------------------------
 # 碰撞分类
 # -----------------------------------------------------------------------------
