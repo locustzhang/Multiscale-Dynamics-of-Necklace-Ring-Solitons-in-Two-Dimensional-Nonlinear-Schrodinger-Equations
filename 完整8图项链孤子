@@ -769,22 +769,38 @@ def run_collision_scan():
 
 def fig_collision_classification(coll_res):
     # =========================================================================
-    # 🔥 新 Fig7：2×2 布局 → 第一行四个指标图
+    # 类型映射：内部标签 → 论文显示标签（统一颜色）
+    # =========================================================================
+    type_display = {
+        'inelastic': 'fusion',        # v≈1.0 在论文中归为 fusion
+        'fusion': 'fusion',
+        'fragmentation': 'fragmentation',
+        'collapse': 'collapse',
+    }
+    COLL_COLORS = {
+        'fusion': '#ff7f0e',          # 橙色
+        'fragmentation': '#9467bd',   # 紫色
+        'collapse': '#d62728',        # 红色
+    }
+
+    # =========================================================================
+    # Fig7：2×2 布局
     # =========================================================================
     fig7 = plt.figure(figsize=(12, 10))
-    gs7 = GridSpec(2, 2, wspace=0.30, hspace=0.38, left=0.07, right=0.97, top=0.92, bottom=0.07)
+    gs7 = GridSpec(2, 2, wspace=0.30, hspace=0.38,
+                   left=0.07, right=0.97, top=0.92, bottom=0.07)
 
     ax_ts = fig7.add_subplot(gs7[0, 0])
     ax_rr = fig7.add_subplot(gs7[0, 1])
     ax_np = fig7.add_subplot(gs7[1, 0])
     ax_rc = fig7.add_subplot(gs7[1, 1])
 
-    patches = [mpatches.Patch(color=c, label=k) for k, c in COLL_COLORS.items()]
-
     # (a) 时序
     for r in coll_res:
-        col = COLL_COLORS.get(r['type'], '#888888')
-        ax_ts.plot(r['t'], r['rho_max'], color=col, lw=1.6, label=f"v={r['v']:.1f}")
+        display_type = type_display.get(r['type'], r['type'])
+        col = COLL_COLORS.get(display_type, '#888888')
+        ax_ts.plot(r['t'], r['rho_max'], color=col, lw=1.6,
+                   label=f"v={r['v']:.1f}")
     ax_ts.set_xlabel('Time $t$')
     ax_ts.set_ylabel(r'$\rho_\mathrm{max}$')
     ax_ts.legend(fontsize=7, ncol=2)
@@ -793,7 +809,8 @@ def fig_collision_classification(coll_res):
 
     # (b) rho_ratio vs v
     for r in coll_res:
-        col = COLL_COLORS.get(r['type'], '#888888')
+        display_type = type_display.get(r['type'], r['type'])
+        col = COLL_COLORS.get(display_type, '#888888')
         ax_rr.scatter(r['v'], r['rho_ratio'], color=col, s=70, zorder=3)
     ax_rr.axhline(2.0, color='grey', ls=':', lw=1.0, label='Fusion bound')
     ax_rr.axhline(0.2, color='grey', ls='--', lw=1.0, label='Frag. bound')
@@ -805,7 +822,8 @@ def fig_collision_classification(coll_res):
 
     # (c) n_peaks vs v
     for r in coll_res:
-        col = COLL_COLORS.get(r['type'], '#888888')
+        display_type = type_display.get(r['type'], r['type'])
+        col = COLL_COLORS.get(display_type, '#888888')
         ax_np.scatter(r['v'], r['n_peaks'], color=col, s=70, zorder=3)
     ax_np.axhline(N_PEAKS, color=C['blue'], ls='-', lw=1.0, alpha=0.5,
                   label=f'Initial ($N_p={N_PEAKS}$)')
@@ -819,7 +837,8 @@ def fig_collision_classification(coll_res):
 
     # (d) radial_corr vs v
     for r in coll_res:
-        col = COLL_COLORS.get(r['type'], '#888888')
+        display_type = type_display.get(r['type'], r['type'])
+        col = COLL_COLORS.get(display_type, '#888888')
         ax_rc.scatter(r['v'], r['radial_corr'], color=col, s=70, zorder=3)
     ax_rc.axhline(0.85, color='grey', ls='--', lw=1.0, label='QE threshold')
     ax_rc.set_xlabel(r'$v$')
@@ -829,34 +848,40 @@ def fig_collision_classification(coll_res):
     style_ax(ax_rc)
     panel_label(ax_rc, 'd')
 
-    # 共享图例
+    # 共享图例（三色）
+    patches = [mpatches.Patch(color=c, label=k)
+               for k, c in COLL_COLORS.items()]
     fig7.legend(handles=patches, loc='upper center', ncol=len(patches),
-               fontsize=9, bbox_to_anchor=(0.5, 0.97))
-#    fig7.suptitle('Fig. 7. Collision classification by incident velocity', fontsize=14, y=0.99)
+                fontsize=9, bbox_to_anchor=(0.5, 0.97))
+
     fig7.savefig(f'{OUTPUT_DIR}/Fig7_CollisionClass.pdf', bbox_inches='tight')
     plt.close()
     print("[Fig7] saved.")
 
     # =========================================================================
-    # 🔥 新 Fig8：1×3 横排（论文格式）
+    # Fig8：1×3 横排
     # =========================================================================
     shown = {}
-    type_order = ['quasi-elastic', 'inelastic', 'fragmentation', 'fusion', 'collapse']
+    type_order = ['fragmentation', 'fusion', 'collapse']  # 论文显示顺序
+
     for r in coll_res:
         ct = r['type']
-        if ct not in shown and r.get('snap_files'):
+        display_ct = type_display.get(ct, ct)
+        if display_ct not in shown and r.get('snap_files'):
             fixed_snaps = []
             for f in r['snap_files']:
                 fname = os.path.basename(f)
-                snap_dir = os.path.join(OUTPUT_DIR, f"Snapshots_coll_v{r['v']:.2f}")
+                snap_dir = os.path.join(OUTPUT_DIR,
+                                        f"Snapshots_coll_v{r['v']:.2f}")
                 fixed_snaps.append(os.path.join(snap_dir, fname))
             r['snap_files'] = fixed_snaps
-            shown[ct] = r
+            shown[display_ct] = r
 
-    snap_types = [t for t in type_order if t in shown][:3]  # 取前3个
+    snap_types = [t for t in type_order if t in shown][:3]
     if len(snap_types) > 0:
-        fig8 = plt.figure(figsize=(15, 5))  # 1行3列 宽幅
-        gs8 = GridSpec(1, 3, wspace=0.25, left=0.05, right=0.95, top=0.90, bottom=0.08)
+        fig8 = plt.figure(figsize=(15, 5))
+        gs8 = GridSpec(1, 3, wspace=0.25,
+                       left=0.05, right=0.95, top=0.90, bottom=0.08)
 
         for col_i, ct in enumerate(snap_types):
             ax = fig8.add_subplot(gs8[col_i])
@@ -871,8 +896,8 @@ def fig_collision_classification(coll_res):
             ax.set_xlim(-LX_COLL * 0.65, LX_COLL * 0.65)
             ax.set_ylim(-LY_COLL * 0.65, LY_COLL * 0.65)
 
-#        fig8.suptitle('Fig. 8. Collision dynamics snapshots', fontsize=14, y=0.97)
-        fig8.savefig(f'{OUTPUT_DIR}/Fig8_CollisionSnapshots.pdf', bbox_inches='tight')
+        fig8.savefig(f'{OUTPUT_DIR}/Fig8_CollisionSnapshots.pdf',
+                     bbox_inches='tight')
         plt.close()
         print("[Fig8] saved.")
 
